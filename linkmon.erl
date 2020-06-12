@@ -5,24 +5,24 @@ start_critic() ->
   spawn(?MODULE, critic, []).
 
 judge(Artist, Album) ->
-  critic ! {self(), {Artist, Album}},
-  Pid = whereis(critic), % race condition possible here.
+  Ref = make_ref(),
+  critic ! {self(), Ref, {Artist, Album}},
   receive
-    {Pid, Verdict} -> Verdict
+    {Ref, Verdict} -> Verdict
   after 2000 ->
     timeout
   end.
 
 critic() ->
   receive
-    {From, {"Rage Against the Turing Machine", "Unit Testify"}} ->
-      From ! {self(), "They are great!"};
-    {From, {"System of a Downtime", "Memoize"}} ->
-      From ! {self(), "They're not Johnny Crash but they're good."};
-    {From, {"Johnny Crash", "The Token Ring of Fire"}} ->
-      From ! {self(), "Simply incredible."};
-    {From, {_Artist, _Album}} ->
-      From ! {self(), "Horrible."}
+    {From, Ref, {"Rage Against the Turing Machine", "Unit Testify"}} ->
+      From ! {Ref, "They are great!"};
+    {From, Ref, {"System of a Downtime", "Memoize"}} ->
+      From ! {Ref, "They're not Johnny Crash but they're good."};
+    {From, Ref, {"Johnny Crash", "The Token Ring of Fire"}} ->
+      From ! {Ref, "Simply incredible."};
+    {From, Ref, {_Artist, _Album}} ->
+      From ! {Ref, "Horrible."}
   end,
   critic().
 
