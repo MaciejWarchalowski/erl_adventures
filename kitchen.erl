@@ -41,6 +41,8 @@ command(Pid, Food, Action) ->
   Pid ! {self(), {Action, Food}},
   receive
     {_From, Msg} -> Msg
+  after 3000 ->
+    timeout
   end.
 
 start(FoodList) ->
