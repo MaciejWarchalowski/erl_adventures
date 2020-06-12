@@ -30,3 +30,15 @@ fridge2(FoodList) ->
     terminate ->
       ok
   end.
+
+store(Pid, Food) ->
+  command(Pid, Food, store).
+
+take(Pid, Food) ->
+  command(Pid, Food, take).
+
+command(Pid, Food, Action) ->
+  Pid ! {self(), {Action, Food}},
+  receive
+    {From, Msg} -> Msg
+  end.
