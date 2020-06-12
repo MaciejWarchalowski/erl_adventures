@@ -40,5 +40,8 @@ take(Pid, Food) ->
 command(Pid, Food, Action) ->
   Pid ! {self(), {Action, Food}},
   receive
-    {From, Msg} -> Msg
+    {_From, Msg} -> Msg
   end.
+
+start(FoodList) ->
+  spawn(?MODULE, fridge2, [FoodList]).
