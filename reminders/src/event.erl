@@ -10,10 +10,10 @@ start(EventName, Delay) ->
 start_link(EventName, Delay) ->
   spawn_link(?MODULE, init, [self(), EventName, Delay]).
 
-init(Server, EventName, Delay) ->
+init(Server, EventName, DateTime) ->
   loop(#state{server=Server,
               name=EventName,
-              to_go=normalize(Delay)}).
+              to_go=time_to_go(DateTime)}).
 
 cancel(Pid) ->
   Ref = erlang:monitor(process, Pid), % In case process is dead.
@@ -44,3 +44,14 @@ loop(S = #state{server = Server, to_go = [T|Next]}) ->
 normalize(N) ->
     Limit = 49*24*60*60,
     [N rem Limit | lists:duplicate(N div Limit, Limit)].
+
+time_to_go(TimeOut = {{_,_,_}, {_,_,_}}) ->
+  Now = calendar:local_time(),
+  ToGo = calendar:datetime_to_gregorian_seconds(TimeOut) - calendar:datetime_to_gregorian_seconds(Now),
+  Secs = if
+    ToGo > 0 -> ToGo;
+    ToGo =< 0 -> 0
+  end,
+  normalize(Secs).
+
+
