@@ -18,18 +18,18 @@ loop(S = #state{clients = Clients, events = Events}) ->
   receive
     {From, Ref, {subscribe, Client}} ->
       ClientRef = erlang:monitor(process, Client),
-      NewClients = orddic:store(ClientRef, Client, Clients),
+      NewClients = orddict:store(ClientRef, Client, Clients),
       From ! {Ref, ok},
       loop(S#state{clients = NewClients});
     {From, Ref, {add, Name, Description, DateTime}} ->
       case valid_datetime(DateTime) of
         true ->
           NewEvent = event:start_link(Name, DateTime),
-          NewEvents = orddic:store(Name, #event{
+          NewEvents = orddict:store(Name, #event{
             name=Name,
             description=Description,
             timeout=DateTime,
-            pid=NewEvent}),
+            pid=NewEvent}, Events),
           From ! {Ref, ok},
           loop(S#state{events=NewEvents});
         false ->
@@ -37,7 +37,7 @@ loop(S = #state{clients = Clients, events = Events}) ->
           loop(S)
       end;
     {From, Ref, {cancel, Name}} ->
-      NewEvents = case orddic:find(Name, Events) of
+      NewEvents = case orddict:find(Name, Events) of
         {ok, E} ->
           event:cancel(E#event.pid),
           orrdic:erase(Name, Events);
@@ -47,10 +47,10 @@ loop(S = #state{clients = Clients, events = Events}) ->
       From ! {Ref, ok},
       loop(S#state{events=NewEvents});
     {done, Name} ->
-      case orddic:find(Name, Events) of
+      case orddict:find(Name, Events) of
         {ok, E} ->
-          ok = send_to_clients({done, E#event.name, E#event.description}, Clients),
-          loop(S#state{events = orddic:erase(Name, Events)});
+          send_to_clients({done, E#event.name, E#event.description}, Clients),
+          loop(S#state{events = orddict:erase(Name, Events)});
         {error} ->
           loop(S)
       end;
@@ -58,7 +58,7 @@ loop(S = #state{clients = Clients, events = Events}) ->
       exit(shutdown);
     code_change ->
       ?MODULE:loop(S);
-    {'DOWN', Ref, process, _Reason} ->
+    {'DOWN', Ref, process, _Pid, _Reason} ->
       loop(S#state{clients=orddict:erase(Ref, Clients)});
     Unknown ->
       io:format("Unknown message: ~p ~n", [Unknown]),
@@ -66,7 +66,7 @@ loop(S = #state{clients = Clients, events = Events}) ->
   end.
 
 send_to_clients(Msg, Clients) ->
-  orddic:map(fun(_Ref, Pid) -> Pid ! Msg end, Clients).
+  orddict:map(fun(_Ref, Pid) -> Pid ! Msg end, Clients).
 
 valid_datetime({Date, Time}) ->
   try
@@ -91,8 +91,8 @@ start_link() ->
   Pid.
 
 init() ->
-  loop(#state{events = orddic:new(),
-              clients = orddic:new()}).
+  loop(#state{events = orddict:new(),
+              clients = orddict:new()}).
 
 terminate() ->
   ?MODULE ! shutdown.
