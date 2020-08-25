@@ -1,64 +1,41 @@
 -module(kitty_server).
--compile(export_all).
+% -compile(export_all).
 -include("records.hrl").
+-export([start_link/0, order_cat/4, return_cat/2, close_shop/1]).
+-export([handle_cast/2, handle_call/3, init/1]).
 
-start_link() -> spawn_link(fun init/0).
+start_link() -> g_server:start_link(?MODULE, []).
 
-init() -> loop([]).
+init([]) -> [].
 
 order_cat(Pid, Name, Color, Description) ->
-  Ref = erlang:monitor(process, Pid),
-  Pid ! {self(), Ref, {order, Name, Color, Description}},
-  receive
-    {Ref, Cat} ->
-      erlang:demonitor(Ref,[flush]),
-      Cat;
-    {'DOWN', Ref, process, Pid, Reason} ->
-      erlang:error(Reason)
-  after 5000 ->
-    erlang:error(timeout)
-  end.
+  g_server:call(Pid, {order, Name, Color, Description}).
 
 return_cat(Pid, Cat) ->
-  Pid ! {return, Cat},
-  ok.
+  g_server:cast(Pid, Cat).
 
 close_shop(Pid) ->
-  Ref = erlang:monitor(process, Pid),
-  Pid ! {self(), Ref, terminate},
-  receive
-    {Ref, ok} ->
-      erlang:demonitor(Ref),
-      ok;
-    {'DOWN', Ref, process, Pid, Reason} ->
-      erlang:error(Reason)
-  after 5000 ->
-    erlang:error(timeout)
-  end.
+  g_server:call(Pid, terminate).
 
-loop(AllCats) ->
-  receive
-    {Pid, Ref, {order, Name, Color, Description}} ->
-      if AllCats =:= [] ->
-          Pid ! {Ref, make_cat(Name, Color, Description)},
-          loop(AllCats);
-         AllCats =/= [] ->
-          Pid ! {Ref, hd(AllCats)},
-          loop(tl(AllCats))
-      end;
-    {return, ReturnedCat = #cat{}} ->
-      loop([ReturnedCat|AllCats]);
-    {Pid, Ref, terminate} ->
-      Pid ! {Ref, ok},
-      terminate(AllCats);
-    Unknown ->
-      io:format("Unknown message received ~p~n", [Unknown]),
-      loop(AllCats)
-  end.
+handle_cast({return, ReturnedCat = #cat{}}, AllCats) ->
+  [ReturnedCat|AllCats].
+
+handle_call({order, Name, Color, Description}, From, AllCats) ->
+  if AllCats =:= [] ->
+      g_server:reply(From, make_cat(Name, Color, Description)),
+      AllCats;
+     AllCats =/= [] ->
+      g_server:reply(From, hd(AllCats)),
+      tl(AllCats)
+  end;
+
+handle_call(terminate, From, AllCats) ->
+  g_server:reply(From, ok),
+  terminate(AllCats).
 
 make_cat(Name, Color, Description) ->
   #cat{name=Name, color=Color, description=Description}.
 
 terminate(Cats) ->
   [io:format("~s was set free!~n", [C#cat.name]) || C <- Cats],
-  ok.
+  exit(normal).
